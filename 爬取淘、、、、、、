@@ -1,0 +1,148 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By #查找元素的方法，此次用于搜索框查找
+from selenium.webdriver.support.ui import WebDriverWait #显示等待，设置最长等待时间，此次用于打开链接的最长等待时间
+from selenium.webdriver.support import expected_conditions as EC #EC.presence_of_element_located()是确认元素是否以及出现或者可点击等
+from selenium.common.exceptions import TimeoutException #异常处理 ， try... exception...
+from pyquery import PyQuery as pq #基于前段的解析代码工具
+from pymongo import MongoClient #导入相应包
+import re #正则表达式
+
+browser = webdriver.Chrome() #打开Chrome浏览器
+wait = WebDriverWait(browser, 10) #设置浏览器等待时间
+
+client = MongoClient() #建立和数据库系统的连接, MongoClient('localhost', post, dbName), MongoClient('本地数据库', 端口, 数据库名称)
+db = client.taobao #连接目标数据库，没有则自动创建
+data = db.taobao #使用data集合，没有则自动创建
+
+#进入淘宝网，输入鞋子，返回页面
+def search():
+    '''
+    此函数的作用为完成首页点击搜索的功能，替换标签可用于其他网页使用
+    :return:
+    '''
+    try:
+        #访问页面
+        browser.get('https://www.taobao.com/')
+        # 定位输入框，q是输入框的CSS属性，在这里捕获它
+        input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#q")))
+        #定位搜索按钮，通过CSS属性获取搜索按钮，模拟用户点击搜索按钮
+        submit = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,'#J_TSearchForm > div.search-button > button')))
+
+        '''
+        wait.until()语句是selenum里面的显示等待，wait是一个WebDriverWWait对象，它设置了等待时间，如果页面在等待时间内
+        没有在DOM中找到元素，将继续等待，超出设定时间后则抛出找不到元素的异常，也可以说程序每隔XX秒看一眼，如果条件成立，
+        则执行下一步，否则继续等待，直到超过设置的最长时间，然后抛出TimeoutException
+        1、presence_of_element_located元素加载出，传入定位元祖，如（By.ID,'p')
+        2、element_to_be_clickable 元素可点击
+        3、text_to_be_present_in_element 某个元素文本包含某文字
+        '''
+
+        #在输入框中输入鞋子，send_keys发送中文时需要明确指出其编码，方法一：在中文前加u可以解决
+        input.send_keys(u'鞋子')
+
+        '''
+        方法二：
+        short = '鞋子'
+        input.send_keys(short.decode('utf-8'))
+        '''
+
+        #此部分是获取全部网页内容
+        submit.click()#模拟用户单击搜索按钮
+        #此部分是获取全部页数查看当前的页码一共是多少页，确保所有页面信息加载完毕
+        total = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR,'#mainsrp-pager > div > div > div > div.total')))
+        #调用得到所有产品函数
+        get_products()
+        #返回总页数
+        return total.text
+
+    #try...except...处理程序异常，try中代码执行，如果存在错误就会抛出异常，然后执行except中的代码，否则，跳过except的代码
+    except TimeoutException:#出现超时异常时，返回search()再次执行一遍search()
+        return search()
+
+#跳转到下一页，此部分内容是获取当前页面，以及翻到哪一页了
+def next_page(page_number):
+    '''
+    翻页函数
+    :param page_number:
+    :return:
+    '''
+    try:
+        #跳转页的输入框
+        input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#mainsrp-pager > div > div > div > div.form > input")))
+        #跳转时的确定按钮
+        submit = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#mainsrp-pager > div > div > div > div.form > span.btn.J_Submit')))
+        #清楚里面的数字，clear()函数用于删除字典内所有元素
+        input.clear()
+        #重新输入数字
+        input.send_keys(page_number)
+        #选择并点击，翻页操作
+        submit.click()
+        #判断当前页是不是我们要实现的页
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR,'#mainsrp-pager > div > div > div > ul > li.item.active > span'),str(page_number)))
+        #调用函数获取商品信息
+        get_products()
+    #捕获超时，重新进入翻页的函数
+    except TimeoutException:
+        next_page(page_number)
+
+
+#解析网页，得到淘宝商品信息
+def get_products():
+    '''
+    搜到的页面信息在此函数爬取我们需要的信息
+    :return:
+    '''
+    #先判断是否加载完毕，每一个商品标签这里是加载出来以后才拿网页源代码
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR,'#mainsrp-itemlist .items .item')))
+    # 获取整个网页源码
+    html = browser.page_source
+    #解析网页源代码
+    doc = pq(html)
+    #pyquery （browser.page_source）就相当于requests.get获取的内容
+    items = doc('#mainsrp-itemlist .items .item').items() #获取所有选择内容
+    for item in items:
+        product = {
+            'image':item.find('.pic .img').attr('src'),
+            'price':item.find('.price').text(),
+            'deal':item.find('.deal-cnt').text()[:-3],
+            'title':item.find('.title').text(),
+            'shop':item.find('.shop').text(),
+            'location':item.find('.location').text(),
+        }
+        print(product)
+        #爬取到的数据保存在数据库中
+        data.insert(product)
+
+def main():
+    try:
+
+        #第一步搜索
+        total = search()
+        #int类型刚才找到的总页数标签，作为跳出循环的条件
+        total = int(re.compile('(\d+)').search(total).group(1))
+        #只要后面还有就继续爬继续翻页，爬取所有的数据用range(2, total+1)
+        for i in range(2,10):
+            next_page(i)
+
+    except Exception:
+        print('出错啦')
+
+    finally:
+        browser.close()
+
+    '''
+    try...finally 的用处是无论是否是否发生异常都要确保资源释放代码的执行
+    一般来说如果没有发生错误，执行过try语句块之后执行finally语句块，完整整个流程。
+    如果try语句块发生了异常，抛出异常，此刻就马上进入finally语句块进行资源释放处理。
+    
+    实测finally之后，try语句块中抛出的异常并没有处理，而是直接被抛出到try...finally语句块之外
+    并且是在finally语句块执行完之后继续抛出这个异常
+    
+    只要程序没有突然中止，finally中的资源释放语句一定会执行
+    无论发生什么异常都会执行finally语句中的代码
+    '''
+
+
+
+if __name__ == '__main__':
+    main()
