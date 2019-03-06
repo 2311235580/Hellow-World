@@ -1,0 +1,32 @@
+from selenium import webdriver
+from selenium.webdriver.support.ui import Select
+driver = webdriver.Chrome()
+
+driver.implicitly_wait(10)
+
+driver.get('https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc')
+
+fromEle = driver.find_element_by_id('fromStationText')
+fromEle.click()
+fromEle.send_keys('深圳北\n') # \n 换行回车的意思
+
+fromEle = driver.find_element_by_id('toStationText')
+fromEle.click()
+fromEle.send_keys('上海\n')
+
+Select(driver.find_element_by_id('cc_start_time'))\
+    .select_by_visible_text('06:00--12:00')
+
+#:nth-child(n) 选择器匹配属于其父元素的第 N 个子元素，不论元素的类型。
+# n 可以是数字、关键词或公式。
+tomorrow = driver.find_element_by_css_selector(
+    '#date_range li:nth-child(2)'
+).click()
+
+xpath = "//*[@id='queryLeftTable']//td[4][@class]/../td[1]//a"
+trains = driver.find_elements_by_xpath(xpath)
+
+for t in trains:
+    print(t.text)
+
+driver.quit()
