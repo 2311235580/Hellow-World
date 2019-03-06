@@ -1,0 +1,84 @@
+from selenium import webdriver
+import time
+
+driver = webdriver.Chrome()
+driver.implicitly_wait(10)
+
+driver.get('https://www.51job.com/')
+
+driver.find_element_by_css_selector("*[href$='advance_search.php']").click()
+
+
+
+
+
+
+
+driver.find_element_by_id('kwdselectid').send_keys('测试')
+
+driver.find_element_by_id('work_position_input').click()
+
+
+
+cities = driver.find_elements_by_css_selector(
+    '#work_position_click_center_right_list_000000 em')
+
+for one in cities:
+    cityName = one.text
+    selected = one.get_attribute('class')
+
+    if cityName == '深圳':
+        if selected != 'on':
+            one.click()
+    else:
+        if selected == 'on':
+            one.click()
+
+driver.find_element_by_id('work_position_click_bottom_save').click()
+driver.find_element_by_css_selector('.tit').click()
+
+#选择职能类别
+driver.find_element_by_id('funtype_click').click()
+
+driver.find_element_by_id(
+    'funtype_click_center_right_list_category_0100_0100').click()
+
+driver.find_element_by_id(
+    'funtype_click_center_right_list_sub_category_each_0100_0100').click()
+
+driver.find_element_by_id('funtype_click_bottom_save').click()
+
+#选择公司性质
+driver.find_element_by_id('cottype_list').click()
+
+driver.find_element_by_css_selector('span[title="创业公司"]').click()
+
+driver.find_element_by_id('workyear_list').click()
+
+driver.find_element_by_css_selector('span[title="1-3年"]').click()
+
+driver.find_element_by_css_selector('span.p_but[onclick^="kwdGoSearch"]').click()
+
+
+
+
+
+
+
+#driver.find_element_by_css_selector('.top_wrap button').click()
+
+jobs = driver.find_elements_by_css_selector(
+    '#resultlist div.el')
+
+
+for job in jobs:
+    if 'title' in job.get_attribute('class'):
+        continue
+
+    fields = job.find_elements_by_tag_name('span')
+
+    print('|'.join([field.text for field in fields]))
+
+
+
+
