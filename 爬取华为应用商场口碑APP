@@ -1,0 +1,63 @@
+from appium import webdriver
+import time
+
+
+desired_caps = {
+    'platformName': 'Android',
+    'platformVersion': '6',
+    'deviceName': 'xxx',
+    # 'app': r'E:\Chrome Downloadsapk\sqauto.apk',
+    'appPackage': 'com.sqauto',
+    'appActivity': 'com.sqauto.MainActivity',
+    'noReset': True,
+    'newCommandTimeout': 6000,
+}
+
+driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_caps) #启动Remote RPC
+driver.implicitly_wait(10)
+
+javaselector = 'new UiSelector().text("排行")'
+driver.find_element_by_android_uiautomator(javaselector).click()
+
+javaselector_2 = 'new UiSelector().text("总榜").resourceId' \
+               '("com.huawei.appmarket:id/ItemTitle")'
+
+ele = driver.find_element_by_android_uiautomator(javaselector)
+
+xPos = ele.location['x']
+yPos = ele.location['y']
+
+javaselector_3 = 'new UiSelector().text("口碑最佳").resourceId' \
+               '("com.huawei.appmarket:id/ItemTitle")'
+driver.implicitly_wait(0.5)
+while True:
+    driver.swipe(xPos,yPos,xPos,yPos-150,800) #y坐标越往上越上，时间设置为800毫秒
+
+    eles = driver.find_elements_by_android_uiautomator(javaselector_3)
+
+    if len(eles) == 0:
+        continue
+
+    driver.swipe(xPos,eles[0].location['y'],xPos,yPos,2000)
+    break
+
+driver.implicitly_wait(10)
+
+eles2 = driver.find_elements_by_class_name('android.widget.TextView')
+textList = []
+for eles in eles2:
+    #print(eles2.text)
+    textList.append(eles.text)
+
+pos = textList.index('口碑最佳')
+
+targetList = textList[pos:]
+
+def getName(No):
+    noIndex = targetList.index(No)
+    return targetList[noIndex + 1]
+
+for i in range(1,6):
+    print(getName(str(i)))
+
+
